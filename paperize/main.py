@@ -9,7 +9,7 @@ from os.path import join, isfile
 from tempfile import TemporaryDirectory
 from hashlib import sha256
 
-PAPERIZE_VERSION = "v1.0.1"
+PAPERIZE_VERSION = "v1.0.2"
 
 QR_VERSION = 21
 
