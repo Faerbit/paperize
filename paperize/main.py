@@ -199,7 +199,12 @@ def prepare_data(data, no_parts, part_length, file_name, hashsum):
         ret.append(part_header + part + PART_TRAILER)
         data = fill(data, 80)[length:]
         i += 1
-    ret[-1] = ret[-1] + CHECKSUM.format(sum=hashsum)
+    checksum = CHECKSUM.format(sum=hashsum)
+    if (len(ret[-1]) + len(checksum) < part_length):
+        ret[-1] = ret[-1] + checksum
+    else:
+        ret.append(PART_HEADER.format(part=len(ret)+1, parts=no_parts)[:-1]
+                + PART_TRAILER + checksum)
     return ret
 
 
