@@ -36,11 +36,11 @@ TEMPLATE_HEADER = (
     "## Backup of file `{file_name}` \n"
     "To restore this file scan the QR codes and "
     "paste them into a plain text file (or several).\n\n"
-    "Then use `paperizer file FILE [FILE ...]` to restore the file.\n\n"
-    "Alternatively, if you don't have the _paperizer_ tool handy, you can just "
-    "remove the _paperizer_ tags and newlines and feed the rest through a "
+    "Then use `paperize file FILE [FILE ...]` to restore the file.\n\n"
+    "Alternatively, if you don't have the _paperize_ tool handy, you can just "
+    "remove the _paperize_ tags and newlines and feed the rest through a "
     "base64 decoding.\n\n"
-    "URL: <https://github.com/faerbit/paperizer>\n\n"
+    "URL to source code: <https://github.com/faerbit/paperize>\n\n"
 )
 
 FILE_NAME = "qr_part_{i}.png"
