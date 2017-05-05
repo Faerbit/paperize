@@ -5,7 +5,7 @@ from base64 import b64encode, b64decode
 from sys import stderr
 from textwrap import fill
 import traceback
-from os.path import join
+from os.path import join, isfile
 from tempfile import TemporaryDirectory
 
 PAPERIZE_VERSION = "v1.0"
@@ -24,6 +24,8 @@ FILE_HEADER = "---pprzv1:1/{parts}:n:{file_name}---\n"
 PART_HEADER = "---pprzv1:{part}/{parts}---\n"
 
 PART_TRAILER = "\n---pprz:end---"
+
+FIND_TRAILER = "---pprz:end---"
 
 TEMPLATE_HEADER = (
     "# Paperzied Backup\n"
@@ -45,7 +47,73 @@ TEMPLATE_PART = (
 )
 
 def mode_file(file_names):
-    print("Importing...")
+    """Convert file_names contents back into the original file."""
+    file_contents = ""
+    for file_name in file_names:
+        with open(file_name) as file:
+            file_contents += file.read()
+    parts = []
+    file_contents = file_contents.replace("\n", "")
+    while file_contents:
+        end = file_contents.find(FIND_TRAILER)
+        end = end + len(FIND_TRAILER)
+        parts.append(file_contents[:end])
+        file_contents = file_contents[end:]
+    data = None
+    no_parts = 0
+    read_parts = None
+    file_name = ""
+    for part in parts:
+        part_data, part_no, part_no_parts, part_file_name = parse_part(part)
+        if (no_parts == 0):
+            no_parts = part_no_parts
+            data = [""] * no_parts
+            read_parts = [0] * no_parts
+            data[part_no] = part_data
+            read_parts[part_no] = 1
+        else:
+            if (part_no_parts != no_parts):
+                print(f"Number of total parts is inconsistent: "
+                    f"{part_no_parts} != {no_parts}. Aborting.", file=stderr)
+                exit(2)
+            data[part_no] = part_data
+            read_parts[part_no] = 1
+        if part_file_name:
+            file_name = part_file_name
+    if (sum(read_parts) != no_parts):
+        print("Not all parts present:", file=stderr)
+        for i, _ in enumerate(read_parts):
+            if read_parts[i] != 1:
+                print(f"Part {i+1} is missing.", file=stderr)
+        exit(2)
+    if (isfile(file_name)):
+        print(f"File {file_name} exists already. Aborting.", file=stderr)
+        exit(2)
+    data = "".join(data)
+    with open(file_name, "xb") as file:
+        file.write(b64decode(data))
+
+def parse_part(part):
+    """
+    Parse one part. Returns (data, part_no, no_parts, file_name).
+    file_name will be None for all but the first part.
+    """
+    # delete trailer
+    part = part.replace(FIND_TRAILER, "")
+    # extract header
+    begin = part.find("---")
+    part = part[begin:]
+    # find finds the beginning so we have to add 3
+    end = part[3:].find("---")
+    header = part[:end+6]
+    data = part[end+6:]
+    header = header.replace("---", "")
+    header = header.split(":")
+    part_no, no_parts = header[1].split("/")
+    file_name = (lambda x: x[3] if len(x) == 4 else None)(header)
+    # subtract one from part_no -> one based index to zero base index
+    return (data, int(part_no) - 1, int(no_parts), file_name)
+
 
 def mode_paper(file_name, ec_level):
     """
