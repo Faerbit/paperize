@@ -7,6 +7,7 @@ from textwrap import fill
 import traceback
 from os.path import join, isfile
 from tempfile import TemporaryDirectory
+from hashlib import sha256
 
 PAPERIZE_VERSION = "v1.0"
 
@@ -26,6 +27,8 @@ PART_HEADER = "---pprzv1:{part}/{parts}---\n"
 PART_TRAILER = "\n---pprz:end---"
 
 FIND_TRAILER = "---pprz:end---"
+
+CHECKSUM = "\n---sha256sum:{sum}---"
 
 TEMPLATE_HEADER = (
     "# Paperzied Backup\n"
@@ -54,6 +57,15 @@ def mode_file(file_names):
             file_contents += file.read()
     parts = []
     file_contents = file_contents.replace("\n", "")
+    # extract checksum
+    begin = file_contents.find("---sha256sum")
+    # find finds the beginning so we have to add 3
+    end = file_contents[begin+3:].find("---")
+    checksum = file_contents[begin:begin+end+6]
+    file_contents = file_contents.replace(checksum, "")
+    checksum = checksum.replace("---", "")
+    checksum = checksum.split(":")[1]
+    # extract parts
     while file_contents:
         end = file_contents.find(FIND_TRAILER)
         end = end + len(FIND_TRAILER)
@@ -90,8 +102,14 @@ def mode_file(file_names):
         print(f"File {file_name} exists already. Aborting.", file=stderr)
         exit(2)
     data = "".join(data)
+    data = b64decode(data)
     with open(file_name, "xb") as file:
-        file.write(b64decode(data))
+        file.write(data)
+    hash = sha256()
+    hash.update(data)
+    if (checksum != hash.hexdigest()):
+        print("Checksum does not match! File might be corrupt!", file=stderr)
+        exit(2)
 
 def parse_part(part):
     """
@@ -103,7 +121,6 @@ def parse_part(part):
     # extract header
     begin = part.find("---")
     part = part[begin:]
-    # find finds the beginning so we have to add 3
     end = part[3:].find("---")
     header = part[:end+6]
     data = part[end+6:]
@@ -134,14 +151,19 @@ def mode_paper(file_name, ec_level):
     data = ""
     with open(file_name, "rb") as file:
         data = file.read()
+    # calculate sha256 hash
+    hash = sha256()
+    hash.update(data)
+    hash_string = hash.hexdigest()
     # convert to base64
     data = b64encode(data).decode("utf-8")
     # split data
     parts = len(data)//MAX_LENGTH[ec_level]
-    split_data = prepare_data(data, parts, MAX_LENGTH[ec_level], file_name)
+    split_data = prepare_data(data, parts, MAX_LENGTH[ec_level], file_name,
+            hash_string)
     if (len(split_data) != parts):
         split_data = prepare_data(data, len(split_data),
-                MAX_LENGTH[ec_level], file_name)
+                MAX_LENGTH[ec_level], file_name, hash_string)
     with TemporaryDirectory() as tmpdir:
         for i, part in enumerate(split_data, 1):
             img = qrcode.make(part,
@@ -157,7 +179,7 @@ def mode_paper(file_name, ec_level):
                 outputfile=f"{file_name}_paperized.pdf",
                 extra_args=["-V", "geometry:margin=1.5cm"])
 
-def prepare_data(data, no_parts, part_length, file_name):
+def prepare_data(data, no_parts, part_length, file_name, hashsum):
     """
     Split data into no_parts chunks, while also adding the headers and
     trailers.
@@ -177,6 +199,7 @@ def prepare_data(data, no_parts, part_length, file_name):
         ret.append(part_header + part + PART_TRAILER)
         data = fill(data, 80)[length:]
         i += 1
+    ret[-1] = ret[-1] + CHECKSUM.format(sum=hashsum)
     return ret
 
 
