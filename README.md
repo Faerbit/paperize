@@ -1,4 +1,4 @@
-# paperize
+# paperize [![PyPI version](https://badge.fury.io/py/paperize.svg)](https://badge.fury.io/py/paperize)
 Converts a binary file to printable QR codes and back.  Generates one nice PDF
 to print out with instructions on how to restore the file. Includes a sha256
 integrity check.
